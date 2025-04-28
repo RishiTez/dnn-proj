@@ -8,3 +8,4 @@
 3. Run any of the models:
     ``` python3 FNN.py ```
    ``` apparent_temp_pred_RNN.py```
+    ``` CNN.py ```
