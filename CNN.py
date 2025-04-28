@@ -213,7 +213,7 @@ def hyperparameter_search(X_train, y_train, X_val, y_val, time_steps=10):
 # Main execution
 def main():
     print("Loading data...")
-    data = pd.read_csv('/Users/abhinav/Desktop/CNN/weatherHistory.csv')
+    data = pd.read_csv('./weather.csv')
     data = data.dropna().copy()
     data = data.sample(frac=0.2, random_state=42).copy()
     data = pd.get_dummies(data)
