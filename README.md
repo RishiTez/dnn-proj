@@ -7,5 +7,5 @@
     ``` pip install -r requirements.txt ```
 3. Run any of the models:
     ``` python3 FNN.py ```
-   ``` apparent_temp_pred_RNN.py```
-    ``` CNN.py ```
+   ``` python3 RNN.py```
+    ``` python3 CNN.py ```
