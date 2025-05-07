@@ -2,10 +2,14 @@
 
 # How to run the code:
 1. Clone the repository:
+\n
     ``` git clone https://github.com/RishiTez/dnn-proj.git ```
+\n
 2. Create Virtual Environment and run the code in it:
+\n
     ``` python3 -m venv env ```
     ``` source env/bin/activate ```
+\n
 2. Install dependencies:
     ``` pip install -r requirements.txt ```
 3. Run any of the models:
