@@ -2,9 +2,9 @@
 
 # How to run the code:
 1. Clone the repository:
-\\
+<br>
     ``` git clone https://github.com/RishiTez/dnn-proj.git ```
-\\
+<br>
 2. Create Virtual Environment and run the code in it:
 \n
     ``` python3 -m venv env ```
