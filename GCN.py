@@ -7,6 +7,7 @@ from sklearn.metrics import r2_score
 from tqdm import tqdm
 import time
 
+# Build adjacency matrix using cosine similarity and k-nearest neighbors
 def build_adjacency_matrix(features, k=5):
     similarity = cosine_similarity(features)
     adj = np.zeros_like(similarity)
@@ -16,10 +17,12 @@ def build_adjacency_matrix(features, k=5):
     np.fill_diagonal(adj, 1)
     return adj
 
+# Normalize adjacency matrix: D^(-1/2) @ A @ D^(-1/2)
 def normalize_adj(adj):
     D = np.diag(1.0 / np.sqrt(np.sum(adj, axis=1)))
     return D @ adj @ D
 
+# Single GCN layer
 class GCNLayer:
     def __init__(self, in_features, out_features):
         self.W = np.random.randn(in_features, out_features) * 0.01
@@ -34,6 +37,7 @@ class GCNLayer:
         self.W -= lr * dW
         return dZ @ self.W.T
 
+# Two-layer GCN model
 class GCN:
     def __init__(self, in_features, hidden_features, out_features):
         self.gcn1 = GCNLayer(in_features, hidden_features)
@@ -49,35 +53,41 @@ class GCN:
         dZ1 = self.gcn2.backward(dZ2, lr)
         _ = self.gcn1.backward(dZ1 * (1 - self.Z1**2), lr)
 
+# Mean Squared Error loss and its gradient
 def mse_loss(pred, true):
     return np.mean((pred - true) ** 2), 2 * (pred - true) / len(true)
 
+# Training function
 def train(X, y, A, hidden_dim, lr, epochs, verbose=False):
     A_hat = normalize_adj(A)
     model = GCN(X.shape[1], hidden_dim, 1)
     losses = []
 
     if verbose:
-        print(f"Training model (Hidden={hidden_dim}, LR={lr}, Epochs={epochs})...")
+        print(f"\nTraining model (Hidden={hidden_dim}, LR={lr}, Epochs={epochs})...")
 
-    for epoch in tqdm(range(epochs), disable=not verbose, desc="Epochs", ncols=100):
+    pbar = tqdm(range(epochs), desc="Training", leave=False, ncols=100, disable=not verbose)
+
+    for epoch in pbar:
         pred = model.forward(X, A_hat).flatten()
         loss, grad = mse_loss(pred, y)
         model.backward(grad.reshape(-1, 1), lr)
         losses.append(loss)
-        if verbose and (epoch % (epochs // 5) == 0 or epoch == epochs - 1):
-            print(f"   Epoch {epoch+1}/{epochs} | Loss: {loss:.4f}")
+
+        # Show status every 50 epochs
+        if verbose and (epoch + 1) % 50 == 0:
+            tqdm.write(f"Epoch {epoch+1}/{epochs} | Loss: {loss:.4f}")
 
     return model, losses[-1]
 
+# Main function
 def main():
-    # set `perform_tuning` to True to perform hyperparameter tuning
-
+    # Toggle this to enable/disable hyperparameter tuning
     # perform_tuning = True
-    perform_tuning = False 
+    perform_tuning = False
 
     print("Loading dataset...")
-    df = pd.read_csv('weather.csv').head(6000) # Only limiting the data to 6000 rows as my system has limited memory
+    df = pd.read_csv('weather.csv').head(6000)  # Limit for memory
     df = df.drop(columns=["Formatted Date", "Daily Summary"])
 
     print("Preprocessing...")
@@ -102,10 +112,13 @@ def main():
         best_loss = float('inf')
         best_params = None
         best_model = None
-        param_grid = [(h, lr, ep) for h in [4, 8, 16, 32] for lr in [0.001, 0.005, 0.01, 0.05, 0.1] for ep in [100, 300, 500]]
+        param_grid = [(h, lr, ep)
+                      for h in [4, 8, 16, 32]
+                      for lr in [0.001, 0.01]
+                      for ep in [100, 300]]
 
-        for hidden, lr, epoch in tqdm(param_grid, desc="Tuning", ncols=100):
-            model, loss = train(X_train, y_train, A_train, hidden, lr, epoch)
+        for hidden, lr, epoch in tqdm(param_grid, desc="Tuning Models", ncols=100):
+            model, loss = train(X_train, y_train, A_train, hidden, lr, epoch, verbose=False)
             if loss < best_loss:
                 best_loss = loss
                 best_params = (hidden, lr, epoch)
@@ -116,18 +129,12 @@ def main():
         print(f"   Training Loss (MSE): {best_loss:.4f}")
     else:
         print("Skipping hyperparameter tuning. Using default settings.")
-        '''
-            The results of hyperparameter tuning for the best parameters are:
-                Hidden: 32
-                LR: 0.01
-                Epochs: 500
-        '''
         hidden, lr, epoch = 32, 0.01, 500
         best_model, best_loss = train(X_train, y_train, A_train, hidden, lr, epoch, verbose=True)
         best_params = (hidden, lr, epoch)
 
     print("\nEvaluating on test set...")
-    A_test = build_adjacency_matrix(X_test, k=5)
+    A_test = build_adjacency_matrix(X_test, k=3)
     A_hat_test = normalize_adj(A_test)
     y_pred = best_model.forward(X_test, A_hat_test).flatten()
 
@@ -141,6 +148,4 @@ if __name__ == "__main__":
     start_time = time.time()
     main()
     end_time = time.time()
-
     print(f"Execution Time: {end_time - start_time:.2f} seconds")
-
