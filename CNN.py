@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import itertools
 
 np.random.seed(42)
 
@@ -28,7 +29,6 @@ def create_sequences(X, y, time_steps=24):
         X_seq.append(X[i:i + time_steps])
         y_seq.append(y[i + time_steps - 1])
     return np.array(X_seq), np.array(y_seq)
-
 
 # CNN Layers
 def relu(x):
@@ -182,22 +182,26 @@ class Dropout:
 
 # CNN Model
 class CNNModel:
-    def __init__(self, input_shape, learning_rate=0.001):
+    def __init__(
+        self, input_shape, learning_rate=0.001, 
+        conv1_filters=64, conv2_filters=128, 
+        kernel_size=3, dropout_rate=0.2
+    ):
         self.learning_rate = learning_rate
         batch_size, seq_len, channels = input_shape
 
-        self.conv1 = Conv1D(num_filters=64, kernel_size=3, input_channels=channels)
+        self.conv1 = Conv1D(num_filters=conv1_filters, kernel_size=kernel_size, input_channels=channels)
         self.pool1 = MaxPooling1D(pool_size=2)
-        self.dropout1 = Dropout(rate=0.2)
+        self.dropout1 = Dropout(rate=dropout_rate)
 
-        self.conv2 = Conv1D(num_filters=128, kernel_size=3, input_channels=64)
+        self.conv2 = Conv1D(num_filters=conv2_filters, kernel_size=kernel_size, input_channels=conv1_filters)
         self.pool2 = MaxPooling1D(pool_size=2)
-        self.dropout2 = Dropout(rate=0.2)
+        self.dropout2 = Dropout(rate=dropout_rate)
 
-        flattened_size = (seq_len // 4) * 128  # after two poolings of size 2
+        flattened_size = (seq_len // 4) * conv2_filters
         self.flatten = Flatten()
         self.dense1 = Dense(flattened_size, 32)
-        self.dropout3 = Dropout(rate=0.2)
+        self.dropout3 = Dropout(rate=dropout_rate)
         self.dense2 = Dense(32, 1)
 
     def forward(self, X):
@@ -306,16 +310,64 @@ def evaluate_model(model, X_test, y_test):
     print(f"R²: {r2:.4f}")
     return mae, mse, rmse, r2
 
+# Hyperparameter Search
+def hyperparameter_search(X_train_seq, y_train_seq, X_val_seq, y_val_seq, input_shape):
+    # Define search space (expand as needed)
+    param_grid = {
+        'learning_rate': [0.001],
+        'batch_size': [64, 128],
+        'conv1_filters': [32, 64],
+        'conv2_filters': [64, 128],
+        'kernel_size': [3],
+        'dropout_rate': [0.2, 0.3],
+        'epochs': [10],
+        'patience': [3]
+    }
+
+    keys, values = zip(*param_grid.items())
+    best_val_loss = float('inf')
+    best_params = None
+    best_model = None
+
+    for v in itertools.product(*values):
+        params = dict(zip(keys, v))
+        print(f"\nTesting params: {params}")
+        model = CNNModel(
+            input_shape=input_shape,
+            learning_rate=params['learning_rate'],
+            conv1_filters=params['conv1_filters'],
+            conv2_filters=params['conv2_filters'],
+            kernel_size=params['kernel_size'],
+            dropout_rate=params['dropout_rate']
+        )
+        train_losses, val_losses = train_model(
+            model, X_train_seq, y_train_seq, X_val_seq, y_val_seq,
+            epochs=params['epochs'],
+            batch_size=params['batch_size'],
+            patience=params['patience']
+        )
+        val_loss = val_losses[-1]
+        print(f"Validation loss: {val_loss:.4f}")
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_params = params
+            best_model = model
+            best_train_losses = train_losses
+            best_val_losses = val_losses
+
+    print(f"\nBest params: {best_params}")
+    print(f"Best validation loss: {best_val_loss:.4f}")
+    return best_model, best_params, best_train_losses, best_val_losses
+
 # Main
 def main():
-    df = pd.read_csv('weather.csv')  # Update path if needed
+    df = pd.read_csv('weatherHistory.csv')  # Update path if needed
     print("Preprocessing data...")
     df = preprocess_data(df)
     target_col = 'Apparent Temperature (C)'
     feature_cols = [col for col in df.columns if col != target_col]
     X = df[feature_cols].values
     y = df[target_col].values
-
     X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.2, random_state=42)
 
@@ -334,23 +386,24 @@ def main():
     print(f"Test shape: {X_test_seq.shape}, {y_test_seq.shape}")
 
     input_shape = X_train_seq.shape  # (samples, time_steps, features)
-    model = CNNModel(input_shape=input_shape, learning_rate=0.001)
+    print("Starting hyperparameter search...")
+    best_model, best_params, train_losses, val_losses = hyperparameter_search(
+        X_train_seq, y_train_seq, X_val_seq, y_val_seq, input_shape
+    )
 
-    train_losses, val_losses = train_model(model, X_train_seq, y_train_seq, X_val_seq, y_val_seq, epochs=10, batch_size=128, patience=3)
-
-    # Plot training and validation loss
+    # Plot training and validation loss for the best model
     plt.figure(figsize=(8, 5))
     plt.plot(train_losses, label='Train Loss', marker='o')
     plt.plot(val_losses, label='Validation Loss', marker='o')
     plt.xlabel('Epoch')
     plt.ylabel('MSE Loss')
-    plt.title('Training and Validation Loss')
+    plt.title('Training and Validation Loss (Best Model)')
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
     plt.show()
 
-    evaluate_model(model, X_test_seq, y_test_seq)
+    evaluate_model(best_model, X_test_seq, y_test_seq)
 
 if __name__ == "__main__":
     main()
