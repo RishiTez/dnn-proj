@@ -6,7 +6,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from itertools import product
 import gc
 
-df = pd.read_csv('/content/weatherHistory.csv')
+df = pd.read_csv('weather.csv')
 df
 
 df.describe()
@@ -19,8 +19,7 @@ df.dropna(inplace=True)
 
 df.duplicated().sum()
 
-df = df.drop_duplicates(
-)
+df = df.drop_duplicates()
 
 """Removing outliers for better model training"""
 
