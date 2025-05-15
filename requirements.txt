@@ -4,5 +4,4 @@ pandas
 pyarrow
 scikit-learn
 matplotlib
-tensorflow
-seaborn
+
