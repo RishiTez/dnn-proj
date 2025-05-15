@@ -361,7 +361,7 @@ def hyperparameter_search(X_train_seq, y_train_seq, X_val_seq, y_val_seq, input_
 
 # Main
 def main():
-    df = pd.read_csv('weatherHistory.csv')  # Update path if needed
+    df = pd.read_csv('weather.csv')
     print("Preprocessing data...")
     df = preprocess_data(df)
     target_col = 'Apparent Temperature (C)'
